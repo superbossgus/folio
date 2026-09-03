@@ -317,6 +317,10 @@ begin
   return new;
 end $$;
 
+-- Se borra antes de crearlo porque este archivo se vuelve a ejecutar cada
+-- vez que cambia una vista o una función, y 'create trigger' no tiene
+-- 'or replace'. Sin esta línea la segunda corrida falla a la mitad.
+drop trigger if exists t_revision on documento_versiones;
 create trigger t_revision after update of antivirus on documento_versiones
   for each row execute function tras_revision();
 
