@@ -11,6 +11,22 @@ export function fecha(iso?: string | null) {
   return `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+/* La hora siempre en el centro de México, no en la del servidor. Un
+   paquete que se armó a las 14:22 tiene que decir 14:22 aunque la página
+   se dibuje en una máquina que cree estar en UTC, porque el usuario la va
+   a comparar contra la hora del correo que mandó. */
+export const ZONA = 'America/Mexico_City';
+
+export function fechaHora(iso?: string | null) {
+  if (!iso) return '—';
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: ZONA, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date(iso));
+  const p = (t: string) => partes.find(x => x.type === t)?.value ?? '';
+  return `${Number(p('day'))} ${MES[Number(p('month')) - 1]} ${p('year')}, ${p('hour')}:${p('minute')}`;
+}
+
 export function pesos(n?: number | null) {
   if (n == null) return '—';
   return '$' + Number(n).toLocaleString('es-MX', { maximumFractionDigits: 0 });

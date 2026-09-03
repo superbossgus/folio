@@ -2,6 +2,7 @@ import { contexto, documentos, tiposDocumento, instituciones,
          fecha, etiquetaVigencia } from '@/lib/datos';
 import Chip from '@/components/Chip';
 import SubirDocumento from '@/components/SubirDocumento';
+import EnviarInformacion from '@/components/EnviarInformacion';
 import MatrizReglas from '@/components/MatrizReglas';
 
 export const dynamic = 'force-dynamic';
@@ -34,13 +35,15 @@ export default async function Boveda() {
     <>
       <h1>Bóveda</h1>
       <p className="sub">
-        Una sola fuente. Cada documento se carga aquí una vez y todos los
-        trámites abiertos lo toman de este lugar. Si lo actualizas, se
-        actualiza en todas las instituciones al mismo tiempo.
+        {rs!.nombre}{rs!.rfc ? ` · ${rs!.rfc}` : ''}. Una sola fuente: cada
+        documento se carga aquí una vez y todos los trámites abiertos lo toman
+        de este lugar. Si lo actualizas, se actualiza en todas las
+        instituciones al mismo tiempo.
       </p>
 
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 16, display: 'flex', gap: 9, flexWrap: 'wrap' }}>
         <SubirDocumento razonSocialId={rs!.id} tipos={tipos} documentos={docs} />
+        <EnviarInformacion razonSocialId={rs!.id} empresa={rs!.nombre} documentos={docs} />
       </div>
 
       {docs.length === 0 ? (

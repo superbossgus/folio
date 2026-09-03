@@ -120,6 +120,7 @@ section{margin-bottom:26px}
 .r-req{grid-template-columns:22px 1fr 128px 104px}
 .r-obl{grid-template-columns:1fr 128px 116px 108px}
 .r-env{grid-template-columns:1fr 160px 116px 96px}
+.r-paq{grid-template-columns:1fr 168px 148px 116px}
 .name{font-weight:600;min-width:0}
 .name small{display:block;font-weight:400;color:var(--ink2);font-size:11.5px;margin-top:1px}
 .num{text-align:right;font-weight:600}
@@ -169,6 +170,13 @@ section{margin-bottom:26px}
   border-top:1px solid var(--line2);font-size:13px;cursor:pointer}
 .pick label:first-child{border-top:none}
 .pick input{width:auto}
+.pick .cat{padding:8px 10px 3px;font-size:10px;font-weight:600;color:var(--ink2);
+  text-transform:uppercase;letter-spacing:.05em;border-top:1px solid var(--line2)}
+.pick .cat:first-child{border-top:none}
+.pick .cat+label{border-top:none}
+.enlace{background:none;border:none;padding:0;font:inherit;font-size:11.5px;
+  color:var(--ink2);text-decoration:underline;cursor:pointer}
+.enlace:hover{color:var(--ink)}
 .mfoot{display:flex;gap:9px;justify-content:flex-end;margin-top:20px}
 
 /* toast */
@@ -199,10 +207,14 @@ table.matrix td.na{color:var(--ink3)}
   .entity select{max-width:180px}
   .kpis{grid-template-columns:1fr 1fr}
   .kpi .v{font-size:19px;overflow-wrap:anywhere}
-  .r-doc,.r-tra,.r-obl,.r-env{grid-template-columns:1fr auto;gap:8px 12px}
+  .r-doc,.r-tra,.r-obl,.r-env,.r-paq{grid-template-columns:1fr auto;gap:8px 12px}
   .r-doc>*:nth-child(2),.r-tra>*:nth-child(2),.r-obl>*:nth-child(2),.r-env>*:nth-child(2){display:none}
   .r-doc>*:nth-child(3),.r-obl>*:nth-child(3),.r-env>*:nth-child(3){grid-column:2;grid-row:1}
   .r-doc>*:nth-child(4),.r-obl>*:nth-child(4),.r-env>*:nth-child(4){grid-column:1/-1;text-align:left}
+  /* En el paquete la columna que importa es la fecha: es el registro. */
+  .r-paq>*:nth-child(2){grid-column:1/-1}
+  .r-paq>*:nth-child(3){grid-column:1/-1}
+  .r-paq>*:nth-child(4){grid-column:2;grid-row:1;text-align:right}
   .r-tra>*:nth-child(4){grid-column:2;grid-row:1}
   .r-tra>*:nth-child(3){grid-column:1/-1}
   .r-req{grid-template-columns:22px 1fr auto}

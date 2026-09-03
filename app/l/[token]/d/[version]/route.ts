@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PDFDocument, StandardFonts, degrees, rgb } from 'pdf-lib';
 import { supabaseAdmin } from '@/lib/supabase';
+import { marcarPdf } from '@/lib/marca';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,45 +50,15 @@ export async function GET(
     });
   }
 
-  try {
-    const pdf = await PDFDocument.load(bytes);
-    const tipografia = await pdf.embedFont(StandardFonts.Helvetica);
-
-    for (const pagina of pdf.getPages()) {
-      const { width, height } = pagina.getSize();
-      pagina.drawText(marca, {
-        x: width * 0.08,
-        y: height * 0.25,
-        size: Math.max(14, Math.min(26, width / 22)),
-        font: tipografia,
-        color: rgb(0.55, 0.6, 0.63),
-        opacity: 0.28,
-        rotate: degrees(32),
-      });
-      pagina.drawText(marca, {
-        x: 28, y: 18, size: 7, font: tipografia,
-        color: rgb(0.42, 0.47, 0.5), opacity: 0.75,
-      });
-    }
-
-    const marcado = await pdf.save();
-    return new NextResponse(marcado as any, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'inline',
-        'Cache-Control': 'no-store, no-cache, must-revalidate, private',
-        'X-Robots-Tag': 'noindex, nofollow',
-      },
-    });
-  } catch {
-    // Un PDF cifrado o corrupto no debe tumbar la descarga: se entrega
-    // sin marca, pero el acceso ya quedó registrado.
-    return new NextResponse(bytes as any, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': 'inline',
-        'Cache-Control': 'no-store, private',
-      },
-    });
-  }
+  // Si el PDF viene cifrado o corrupto, marcarPdf devuelve el original:
+  // la descarga no se cae y el acceso ya quedó registrado de todas formas.
+  const marcado = await marcarPdf(bytes, marca);
+  return new NextResponse(marcado as any, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      'X-Robots-Tag': 'noindex, nofollow',
+    },
+  });
 }

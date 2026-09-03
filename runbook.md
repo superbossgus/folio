@@ -53,6 +53,10 @@ order by rowsecurity, tablename;
 
 Toda tabla debe decir `true`. Si alguna dice `false`, esa tabla está expuesta.
 
+Si ya habías cargado el esquema antes de que existieran los paquetes en zip,
+corre además `migracion-02-paquetes.sql` y vuelve a ejecutar `vistas.sql`. Si
+cargaste todo hoy, ignóralo: ya viene incluido.
+
 ## Paso 3 · Configurar el acceso
 
 Authentication → Providers: deja solo **Email**. Apaga los demás por ahora.

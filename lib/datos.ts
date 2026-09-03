@@ -79,6 +79,13 @@ export async function envios(sb: any, rsId: string) {
   return data ?? [];
 }
 
+export async function paquetes(sb: any, rsId: string) {
+  const { data } = await sb.from('paquetes')
+    .select('*, paquete_items(etiqueta), paquete_descargas(ocurrio_en, bytes)')
+    .eq('razon_social_id', rsId).order('creado_en', { ascending: false });
+  return data ?? [];
+}
+
 export async function instituciones(sb: any) {
   const { data } = await sb.from('instituciones')
     .select('id, nombre, tipo').eq('activa', true).order('nombre');

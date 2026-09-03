@@ -420,3 +420,87 @@ do $$ begin
     grant execute on function registrar_descarga(text, uuid, inet, text) to service_role;
   end if;
 end $$;
+
+-- =====================================================================
+-- PAQUETES
+-- El zip que el usuario baja para mandarlo él por correo. La regla de
+-- qué se puede meter vive aquí, no en la aplicación: una versión que no
+-- pasó la revisión antivirus no sale de la bóveda por ningún camino, ni
+-- por liga ni por adjunto.
+--
+-- El nombre del zip y el de cada archivo dentro se deciden también aquí,
+-- porque son parte del registro: dentro de un año hay que poder abrir un
+-- correo viejo y saber qué renglón de esta tabla lo generó.
+-- =====================================================================
+
+-- Los parámetros de salida se llaman id_paquete y nombre_zip, y no
+-- paquete_id ni archivo, porque en PL/pgSQL un parámetro de salida es una
+-- variable más: si se llamara igual que una columna de las tablas que esta
+-- función toca, cada consulta de adentro quedaría ambigua.
+create or replace function crear_paquete(
+  p_rs uuid, p_destinatario text, p_versiones uuid[],
+  p_correo text default null, p_organizacion text default null,
+  p_motivo text default null, p_marca boolean default true)
+returns table (id_paquete uuid, nombre_zip text)
+language plpgsql security invoker as $$
+declare
+  p uuid; vid uuid; n integer := 0; ahora timestamp; zip text;
+begin
+  if nullif(trim(coalesce(p_destinatario, '')), '') is null then
+    raise exception 'falta el nombre de quien va a recibir el paquete';
+  end if;
+  if coalesce(array_length(p_versiones, 1), 0) = 0 then
+    raise exception 'no se eligió ningún documento';
+  end if;
+
+  -- Hora del centro de México, no la del servidor: el sello que se
+  -- imprime y el que se registra tienen que ser el mismo, y el usuario
+  -- lo va a comparar contra la hora del correo que mandó.
+  ahora := now() at time zone 'America/Mexico_City';
+
+  zip := 'folio-'
+    || lower(regexp_replace(
+         coalesce(nullif((select rs.rfc from razones_sociales rs where rs.id = p_rs), ''), 'expediente'),
+         '[^A-Za-z0-9]', '', 'g'))
+    || '-' || to_char(ahora, 'YYYYMMDD-HH24MI') || '.zip';
+
+  insert into paquetes (razon_social_id, destinatario, organizacion, correo,
+                        motivo, marca_agua, archivo, creado_por)
+  values (p_rs,
+          trim(p_destinatario),
+          nullif(trim(coalesce(p_organizacion, '')), ''),
+          nullif(trim(coalesce(p_correo, '')), ''),
+          nullif(trim(coalesce(p_motivo, '')), ''),
+          case when p_marca then
+            trim(p_destinatario)
+            || coalesce(' · ' || nullif(trim(coalesce(p_correo, '')), ''), '')
+            || ' · ' || to_char(ahora, 'DD/MM/YYYY HH24:MI')
+          end,
+          zip, auth.uid())
+  returning paquetes.id into p;
+
+  foreach vid in array p_versiones loop
+    n := n + 1;
+    insert into paquete_items (paquete_id, version_id, etiqueta, archivo)
+    select p, vid,
+           d.nombre || ' v' || dv.version,
+           lpad(n::text, 2, '0') || ' '
+             || regexp_replace(d.nombre, '[^A-Za-z0-9áéíóúÁÉÍÓÚñÑ .,()-]', '-', 'g')
+             || ' v' || dv.version || '.'
+             || coalesce(nullif(lower(regexp_replace(dv.ruta, '^.*\.', '')), lower(dv.ruta)), 'pdf')
+      from documento_versiones dv
+      join documentos d on d.id = dv.documento_id
+     where dv.id = vid
+       and dv.antivirus = 'limpio'
+       and d.razon_social_id = p_rs;
+  end loop;
+
+  -- Si algo se quedó fuera, el paquete completo se cae. Un zip al que le
+  -- falta un documento y no lo dice es peor que ningún zip.
+  if (select count(*) from paquete_items pi where pi.paquete_id = p)
+     <> array_length(p_versiones, 1) then
+    raise exception 'hay documentos sin revisión antivirus, o que no son de esta razón social';
+  end if;
+
+  return query select p, zip;
+end $$;

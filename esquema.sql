@@ -394,6 +394,53 @@ create table envio_accesos (
 create index on envio_accesos (envio_id, ocurrio_en desc);
 
 -- =====================================================================
+-- 6B. PAQUETES
+--     La liga sigue siendo la entrega buena. Pero hay ejecutivos que
+--     piden el expediente en un zip por correo y no se les va a
+--     discutir: si el archivo va a salir de todas formas, que salga de
+--     aquí y no de una carpeta suelta en el escritorio de alguien.
+--
+--     Un adjunto no caduca, no se revoca y no avisa quién lo abrió. Lo
+--     único que queda es el registro de haberlo armado, así que ese
+--     registro se guarda completo y no se puede tocar después: para
+--     quién era, qué versión exacta llevaba y a qué hora se generó.
+-- =====================================================================
+
+create table paquetes (
+  id              uuid primary key default gen_random_uuid(),
+  razon_social_id uuid not null references razones_sociales(id) on delete cascade,
+  destinatario    text not null,                 -- la persona que va a recibir el zip
+  organizacion    text,                          -- institución o empresa donde trabaja
+  correo          citext,                        -- a dónde dijo el usuario que lo mandaría
+  motivo          text,
+  marca_agua      text,                          -- null = se armó sin marca
+  archivo         text not null,                 -- nombre del zip
+  creado_en       timestamptz not null default now(),
+  creado_por      uuid references perfiles(id)
+);
+create index on paquetes (razon_social_id, creado_en desc);
+
+create table paquete_items (
+  paquete_id  uuid not null references paquetes(id) on delete cascade,
+  version_id  uuid not null references documento_versiones(id) on delete restrict,
+  etiqueta    text not null,
+  archivo     text not null,                     -- nombre dentro del zip
+  primary key (paquete_id, version_id)
+);
+
+-- El zip se vuelve a armar desde el registro cuantas veces haga falta,
+-- siempre con las mismas versiones. Cada vez queda un renglón.
+create table paquete_descargas (
+  id          bigserial primary key,
+  paquete_id  uuid not null references paquetes(id) on delete cascade,
+  perfil_id   uuid references perfiles(id) on delete set null,
+  bytes       bigint,
+  ip          inet,
+  ocurrio_en  timestamptz not null default now()
+);
+create index on paquete_descargas (paquete_id, ocurrio_en desc);
+
+-- =====================================================================
 -- 7. DESPUÉS DE LA FIRMA
 --    Es el módulo que evita que cancelen la suscripción cuando cierra
 --    el crédito.
@@ -473,6 +520,7 @@ create trigger t_bit_ver     after insert                     on documento_versi
 create trigger t_bit_tramite after insert or update or delete on tramites            for each row execute function registrar();
 create trigger t_bit_req     after update                     on requisitos          for each row execute function registrar();
 create trigger t_bit_envio   after insert or update           on envios              for each row execute function registrar();
+create trigger t_bit_paq     after insert                     on paquetes            for each row execute function registrar();
 create trigger t_bit_contr   after insert or update or delete on contratos           for each row execute function registrar();
 
 -- =====================================================================
@@ -495,6 +543,9 @@ alter table requisitos           enable row level security;
 alter table envios               enable row level security;
 alter table envio_items          enable row level security;
 alter table envio_accesos        enable row level security;
+alter table paquetes             enable row level security;
+alter table paquete_items        enable row level security;
+alter table paquete_descargas    enable row level security;
 alter table contratos            enable row level security;
 alter table obligaciones         enable row level security;
 alter table bitacora             enable row level security;
@@ -580,6 +631,25 @@ create policy p_ei_esc on envio_items for insert
 create policy p_ea_lee on envio_accesos for select
   using (exists (select 1 from envios e where e.id = envio_id and e.razon_social_id in (select rs_visibles())));
 
+-- Paquetes: se arman y se leen, nunca se corrigen. El renglón es la
+-- prueba de qué salió por correo, y una prueba que se puede editar
+-- después no sirve de nada.
+create policy p_paq_lee on paquetes for select using (razon_social_id in (select rs_visibles()));
+create policy p_paq_ins on paquetes for insert
+  with check (razon_social_id in (select rs_editables()));
+
+create policy p_pi_lee on paquete_items for select
+  using (exists (select 1 from paquetes p where p.id = paquete_id and p.razon_social_id in (select rs_visibles())));
+create policy p_pi_ins on paquete_items for insert
+  with check (exists (select 1 from paquetes p where p.id = paquete_id and p.razon_social_id in (select rs_editables())));
+
+-- Volver a bajar el zip lo puede hacer cualquiera que ya podía ver esos
+-- documentos; lo que no puede es borrar el rastro de haberlo bajado.
+create policy p_pd_lee on paquete_descargas for select
+  using (exists (select 1 from paquetes p where p.id = paquete_id and p.razon_social_id in (select rs_visibles())));
+create policy p_pd_ins on paquete_descargas for insert
+  with check (exists (select 1 from paquetes p where p.id = paquete_id and p.razon_social_id in (select rs_visibles())));
+
 create policy p_con_lee on contratos for select using (razon_social_id in (select rs_visibles()));
 create policy p_con_esc on contratos for all
   using (razon_social_id in (select rs_editables()))
@@ -606,6 +676,9 @@ begin
       execute format('revoke update, delete on bitacora from %I', r);
       execute format('revoke update, delete on documento_versiones from %I', r);
       execute format('revoke update, delete on envio_accesos from %I', r);
+      execute format('revoke update, delete on paquetes from %I', r);
+      execute format('revoke update, delete on paquete_items from %I', r);
+      execute format('revoke update, delete on paquete_descargas from %I', r);
       execute format('revoke insert, update, delete on bitacora from %I', r);
     end if;
   end loop;

@@ -21,9 +21,11 @@ nunca va a poder hacer:
    domicilio de 60 días y Banorte de 90. El mismo archivo puede estar
    vigente en un banco y vencido en otro, y el sistema lo dice antes de que
    el analista lo rechace.
-3. **Entrega con trazabilidad.** No se mandan adjuntos: se manda una liga
-   con caducidad y marca de agua a nombre de quien la recibe, y queda
-   registro de cada apertura y descarga.
+3. **Entrega con trazabilidad.** La entrega buena es una liga con caducidad
+   y marca de agua a nombre de quien la recibe, con registro de cada
+   apertura y descarga. Cuando del otro lado exigen el expediente adjunto y
+   no hay manera de convencerlos, el zip se arma desde la bóveda y queda
+   sellado a quién iba, qué llevaba y a qué hora.
 
 La lógica vive en Postgres, no aquí. Las vistas y funciones de `vistas.sql`
 son la única implementación de las reglas; esta aplicación las consulta.
@@ -76,14 +78,16 @@ app/
     boveda/               documentos, versiones y matriz de reglas
     tramites/[id]/        requisitos evaluados con la regla de esa institución
     contratos/            créditos vigentes y obligaciones posteriores a la firma
-    envios/               ligas emitidas y su bitácora de accesos
+    envios/               ligas emitidas y paquetes en zip, con su bitácora
   l/[token]/              página pública de una liga; la única sin sesión
+  api/paquetes/[id]/zip/  arma el zip de un paquete ya registrado
   api/webhook/antivirus/  resultado de la revisión de archivos
 lib/
   supabase.ts             clientes de servidor y de servicio
   supabase-navegador.ts   cliente del navegador
   datos.ts                sesión, razón social activa y consultas
   formato.ts              fechas, montos y catálogos
+  marca.ts                la marca de agua, para los dos caminos de salida
   acciones.ts             acciones de servidor
 ```
 
@@ -117,6 +121,19 @@ servicio de terceros esté caído.
 **El token de una liga solo se muestra una vez.** En la base queda su huella
 criptográfica. Si se pierde, se genera otro envío; no hay forma de
 recuperarlo, y eso es correcto.
+
+**El zip existe porque negarlo no lo evita.** Hay ejecutivos que piden el
+expediente adjunto y no aceptan una liga. Prohibirlo en el sistema no hace
+que dejen de pedirlo: hace que alguien arme el zip a mano desde su escritorio
+y no quede rastro de nada. Así que el zip se arma aquí, con marca de agua, y
+el registro de haberlo armado se guarda antes que el archivo. Un adjunto no
+caduca ni se revoca; lo único recuperable es saber qué salió y para quién.
+
+**El registro de un paquete no se puede editar ni borrar.** Igual que la
+bitácora y las versiones: `paquetes`, `paquete_items` y `paquete_descargas`
+solo aceptan inserciones, y los permisos de `update` y `delete` están
+revocados a nivel de tabla. Una prueba que se puede corregir después no
+prueba nada.
 
 ---
 

@@ -203,6 +203,40 @@ export async function revocarEnvio(envioId: string) {
   return { ok: true };
 }
 
+/* -------------------------------------------------------------- paquetes */
+
+/** Registra el paquete que el usuario va a mandar por correo con sus
+ *  propias manos. Aquí no se arma el zip: esto solo deja sellado a quién
+ *  iba, qué versiones llevaba y a qué hora. El archivo se baja después
+ *  desde /api/paquetes/[id]/zip, y se puede volver a bajar, siempre con
+ *  las mismas versiones que quedaron en este renglón.
+ *
+ *  El registro se guarda ANTES de que exista el archivo, a propósito. Si
+ *  el zip fallara a medio armar, la intención de haberlo mandado ya
+ *  quedó anotada; al revés no: un adjunto que salió sin registro es
+ *  exactamente el problema que este módulo viene a resolver. */
+export async function crearPaquete(datos: {
+  razonSocialId: string; destinatario: string; versiones: string[];
+  correo?: string; organizacion?: string; motivo?: string; marcaAgua?: boolean;
+}) {
+  const sb = await supabaseServidor();
+
+  const { data, error } = await sb.rpc('crear_paquete', {
+    p_rs: datos.razonSocialId,
+    p_destinatario: datos.destinatario,
+    p_versiones: datos.versiones,
+    p_correo: datos.correo ?? null,
+    p_organizacion: datos.organizacion ?? null,
+    p_motivo: datos.motivo ?? null,
+    p_marca: datos.marcaAgua ?? true,
+  });
+  if (error) return { error: error.message.replace(/^.*?:\s*/, '') };
+
+  const fila = Array.isArray(data) ? data[0] : data;
+  revalidatePath('/envios');
+  return { ok: true, paqueteId: fila.id_paquete as string, archivo: fila.nombre_zip as string };
+}
+
 /* --------------------------------------------------------- obligaciones */
 
 export async function cumplirObligacion(obligacionId: string) {
